@@ -134,6 +134,7 @@ class AssignmentResponse(BaseSchema):
     submitted_at: Optional[datetime] = None
     grade: Optional[int] = None
     feedback: Optional[str] = None
+    course_title: Optional[str] = None
 
 # ----------------- SUBMISSION SCHEMAS -----------------
 class SubmissionResponse(BaseSchema):

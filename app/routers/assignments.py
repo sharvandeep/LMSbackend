@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import os
 import shutil
@@ -15,6 +15,52 @@ SUBMISSIONS_DIR = "static/uploads/submissions"
 os.makedirs(SUBMISSIONS_DIR, exist_ok=True)
 
 # ----------------- ASSIGNMENT ENDPOINTS -----------------
+
+@router.get("/assignments", response_model=List[schemas.AssignmentResponse])
+def get_all_assignments(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Admin sees all assignments
+    if current_user.role == "admin":
+        assignments = db.query(models.Assignment).options(joinedload(models.Assignment.course)).all()
+    # 2. Teacher sees assignments for courses they teach
+    elif current_user.role == "teacher":
+        assignments = db.query(models.Assignment).join(models.Course).filter(
+            models.Course.teacher_id == current_user.user_id
+        ).options(joinedload(models.Assignment.course)).all()
+    # 3. Student sees assignments for courses they are enrolled in
+    elif current_user.role == "student":
+        assignments = db.query(models.Assignment).join(models.Enrollment, models.Enrollment.course_id == models.Assignment.course_id).filter(
+            models.Enrollment.student_id == current_user.user_id
+        ).options(joinedload(models.Assignment.course)).all()
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    response_data = []
+    # Cache student submissions to avoid N+1 queries if student is requesting
+    submissions_dict = {}
+    if current_user.role == "student":
+        submissions = db.query(models.Submission).filter(
+            models.Submission.student_id == current_user.user_id
+        ).all()
+        submissions_dict = {sub.assignment_id: sub for sub in submissions}
+
+    for asg in assignments:
+        submission = submissions_dict.get(asg.assignment_id) if current_user.role == "student" else None
+        
+        response_data.append(schemas.AssignmentResponse(
+            assignment_id=asg.assignment_id,
+            course_id=asg.course_id,
+            title=asg.title,
+            description=asg.description,
+            due_date=asg.due_date,
+            total_marks=asg.total_marks,
+            created_at=asg.created_at,
+            student_status=submission.status if submission else "Not Submitted",
+            submitted_at=submission.submitted_at if submission else None,
+            grade=submission.marks if submission else None,
+            feedback=submission.feedback if submission else None,
+            course_title=asg.course.title if asg.course else None
+        ))
+    return response_data
 
 @router.get("/courses/{course_id}/assignments", response_model=List[schemas.AssignmentResponse])
 def get_course_assignments(course_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
