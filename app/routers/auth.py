@@ -213,67 +213,68 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
         
         db.commit()
         
-        # Dispatch student email verification
-        verify_link = f"http://localhost:5173/verify-email?token={verification_token}"
-        logging.info("\n" + "="*80)
-        logging.info(" EMAIL VERIFICATION LINK GENERATED")
-        logging.info(f" Student: {new_user.full_name} ({new_user.email})")
-        logging.info(f" Verification Link: {verify_link}")
-        logging.info("="*80 + "\n")
-        
-        # Send real SMTP mail if configured
-        smtp_server = os.getenv("SMTP_SERVER")
-        smtp_port = os.getenv("SMTP_PORT")
-        smtp_username = os.getenv("SMTP_USERNAME")
-        smtp_password = os.getenv("SMTP_PASSWORD")
-        smtp_from = os.getenv("SMTP_FROM", "noreply@lms.com")
-        smtp_display_name = os.getenv("SMTP_DISPLAY_NAME", "LearnSphear")
-        
-        if smtp_server and smtp_port and smtp_username and smtp_password:
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = f'"{smtp_display_name}" <{smtp_from}>' if smtp_display_name else smtp_from
-                msg['To'] = new_user.email
-                msg['Subject'] = f"{smtp_display_name} - Verify Your Account"
-                
-                html_content = f"""
-                <html>
-                    <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8fafc; padding: 30px; margin: 0; color: #1e293b;">
-                        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                            <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); padding: 30px; text-align: center; color: white;">
-                                <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em;">Welcome to LearnSphear!</h1>
-                                <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Account Activation</p>
-                            </div>
-                            <div style="padding: 35px 30px; line-height: 1.6; font-size: 16px;">
-                                <p style="margin-top: 0; font-weight: 600;">Hi {new_user.full_name},</p>
-                                <p>Thank you for registering at LearnSphear LMS. To activate your student account and access your dashboard, please verify your email address by clicking the button below:</p>
-                                
-                                <div style="text-align: center; margin: 30px 0;">
-                                    <a href="{verify_link}" style="background-color: #0284c7; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.2);">Verify Email Address</a>
+        # Dispatch student email verification (only if not auto-verified)
+        if not is_verified:
+            verify_link = f"http://localhost:5173/verify-email?token={verification_token}"
+            logging.info("\n" + "="*80)
+            logging.info(" EMAIL VERIFICATION LINK GENERATED")
+            logging.info(f" Student: {new_user.full_name} ({new_user.email})")
+            logging.info(f" Verification Link: {verify_link}")
+            logging.info("="*80 + "\n")
+            
+            # Send real SMTP mail if configured
+            smtp_server = os.getenv("SMTP_SERVER")
+            smtp_port = os.getenv("SMTP_PORT")
+            smtp_username = os.getenv("SMTP_USERNAME")
+            smtp_password = os.getenv("SMTP_PASSWORD")
+            smtp_from = os.getenv("SMTP_FROM", "noreply@lms.com")
+            smtp_display_name = os.getenv("SMTP_DISPLAY_NAME", "LearnSphear")
+            
+            if smtp_server and smtp_port and smtp_username and smtp_password:
+                try:
+                    msg = MIMEMultipart()
+                    msg['From'] = f'"{smtp_display_name}" <{smtp_from}>' if smtp_display_name else smtp_from
+                    msg['To'] = new_user.email
+                    msg['Subject'] = f"{smtp_display_name} - Verify Your Account"
+                    
+                    html_content = f"""
+                    <html>
+                        <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8fafc; padding: 30px; margin: 0; color: #1e293b;">
+                            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); padding: 30px; text-align: center; color: white;">
+                                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em;">Welcome to LearnSphear!</h1>
+                                    <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Account Activation</p>
                                 </div>
-                                
-                                <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
-                                    If the button above doesn't work, copy and paste the link below into your web browser:<br>
-                                    <a href="{verify_link}" style="color: #0284c7; word-break: break-all;">{verify_link}</a>
-                                </p>
+                                <div style="padding: 35px 30px; line-height: 1.6; font-size: 16px;">
+                                    <p style="margin-top: 0; font-weight: 600;">Hi {new_user.full_name},</p>
+                                    <p>Thank you for registering at LearnSphear LMS. To activate your student account and access your dashboard, please verify your email address by clicking the button below:</p>
+                                    
+                                    <div style="text-align: center; margin: 30px 0;">
+                                        <a href="{verify_link}" style="background-color: #0284c7; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.2);">Verify Email Address</a>
+                                    </div>
+                                    
+                                    <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
+                                        If the button above doesn't work, copy and paste the link below into your web browser:<br>
+                                        <a href="{verify_link}" style="color: #0284c7; word-break: break-all;">{verify_link}</a>
+                                    </p>
+                                </div>
+                                <div style="background-color: #f8fafc; padding: 20px 30px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+                                    If you did not sign up for this account, you can safely ignore this email.
+                                </div>
                             </div>
-                            <div style="background-color: #f8fafc; padding: 20px 30px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-                                If you did not sign up for this account, you can safely ignore this email.
-                            </div>
-                        </div>
-                    </body>
-                </html>
-                """
-                msg.attach(MIMEText(html_content, 'html'))
-                
-                server = smtplib.SMTP(smtp_server, int(smtp_port))
-                server.starttls()
-                server.login(smtp_username, smtp_password)
-                server.sendmail(smtp_from, new_user.email, msg.as_string())
-                server.close()
-                logging.info(f"Verification email sent to {new_user.email}")
-            except Exception as e:
-                logging.error(f"Failed to send SMTP verification email: {e}")
+                        </body>
+                    </html>
+                    """
+                    msg.attach(MIMEText(html_content, 'html'))
+                    
+                    server = smtplib.SMTP(smtp_server, int(smtp_port))
+                    server.starttls()
+                    server.login(smtp_username, smtp_password)
+                    server.sendmail(smtp_from, new_user.email, msg.as_string())
+                    server.close()
+                    logging.info(f"Verification email sent to {new_user.email}")
+                except Exception as e:
+                    logging.error(f"Failed to send SMTP verification email: {e}")
         
         # Create access token for the newly registered and auto-verified student
         access_token = security.create_access_token(
