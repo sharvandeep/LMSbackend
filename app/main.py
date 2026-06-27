@@ -20,7 +20,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
-    "https://leraning-managment-system.vercel.app",
+    "https://leraning-managment-system-bay.vercel.app",
 ]
 
 frontend_url = os.getenv("FRONTEND_URL")
