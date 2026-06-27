@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Load environment variables
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:admin123@localhost:5432/lms_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1234@localhost:5432/lms_db")
 
 # Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
