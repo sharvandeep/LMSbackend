@@ -106,9 +106,9 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
     # Hash the password
     hashed_password = security.get_password_hash(payload.password)
     
-    # Determine verification status
-    is_verified = True if role != "student" else False
-    verification_token = uuid.uuid4().hex if role == "student" else None
+    # Determine verification status (Auto-verified to support cloud deployments without SMTP)
+    is_verified = True
+    verification_token = None
     
     # Create new user
     new_user = models.User(
@@ -275,8 +275,11 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
             except Exception as e:
                 logging.error(f"Failed to send SMTP verification email: {e}")
         
-        # For student, we return empty token so they are prompted to verify first
-        return {"token": "", "user_id": new_user.user_id, "role": new_user.role}
+        # Create access token for the newly registered and auto-verified student
+        access_token = security.create_access_token(
+            data={"sub": str(new_user.user_id), "role": new_user.role}
+        )
+        return {"token": access_token, "user_id": new_user.user_id, "role": new_user.role}
     
     # Create access token for teachers/admins who are auto-verified
     access_token = security.create_access_token(
