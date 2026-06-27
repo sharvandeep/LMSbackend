@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -345,31 +345,7 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
-@router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    import os
-    user = db.query(models.User).filter(models.User.email == payload.email).first()
-    if not user:
-        # Factual, uniform response to prevent user enumeration
-        return {"message": "If the email is registered, you will receive a reset link shortly."}
-        
-    expires_delta = timedelta(minutes=15)
-    token = security.create_access_token(
-        data={"sub": str(user.user_id), "purpose": "password_reset"},
-        expires_delta=expires_delta
-    )
-    
-    reset_link = f"http://localhost:5173/reset-password/{token}"
-    
-    # 1. Print the link to the console for easy local development testing
-    import logging
-    logging.info("\n" + "="*80)
-    logging.info(" PASSWORD RESET REQUESTED")
-    logging.info(f" User: {user.full_name} ({user.email})")
-    logging.info(f" Reset Link: {reset_link}")
-    logging.info("="*80 + "\n")
-    
-    # 2. Try to send a real email using SMTP if configured in environment
+def send_reset_password_email(email: str, full_name: str, reset_link: str):
     smtp_server = os.getenv("SMTP_SERVER")
     smtp_port = os.getenv("SMTP_PORT")
     smtp_username = os.getenv("SMTP_USERNAME")
@@ -385,10 +361,10 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
             
             msg = MIMEMultipart()
             msg['From'] = f'"{smtp_display_name}" <{smtp_from}>' if smtp_display_name else smtp_from
-            msg['To'] = user.email
+            msg['To'] = email
             msg['Subject'] = f"{smtp_display_name} Password Reset Request"
             
-            body = f"""Hi {user.full_name},
+            body = f"""Hi {full_name},
             
 We received a request to reset the password for your {smtp_display_name} account.
 You can reset your password by clicking the link below:
@@ -406,11 +382,39 @@ Regards,
             server = smtplib.SMTP(smtp_server, int(smtp_port))
             server.starttls()
             server.login(smtp_username, smtp_password)
-            server.sendmail(smtp_from, user.email, msg.as_string())
+            server.sendmail(smtp_from, email, msg.as_string())
             server.close()
-            logging.info(f"Real reset email sent successfully to {user.email}")
+            logging.info(f"Real reset email sent successfully to {email}")
         except Exception as e:
             logging.error(f"Failed to send SMTP email (logged to console instead): {e}")
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    import os
+    user = db.query(models.User).filter(models.User.email == payload.email).first()
+    if not user:
+        # Factual, uniform response to prevent user enumeration
+        return {"message": "If the email is registered, you will receive a reset link shortly."}
+        
+    expires_delta = timedelta(minutes=15)
+    token = security.create_access_token(
+        data={"sub": str(user.user_id), "purpose": "password_reset"},
+        expires_delta=expires_delta
+    )
+    
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url}/reset-password/{token}"
+    
+    # 1. Print the link to the console for easy local development testing
+    import logging
+    logging.info("\n" + "="*80)
+    logging.info(" PASSWORD RESET REQUESTED")
+    logging.info(f" User: {user.full_name} ({user.email})")
+    logging.info(f" Reset Link: {reset_link}")
+    logging.info("="*80 + "\n")
+    
+    # 2. Try to send a real email using SMTP in the background
+    background_tasks.add_task(send_reset_password_email, user.email, user.full_name, reset_link)
             
     return {"message": "If the email is registered, you will receive a reset link shortly."}
 
