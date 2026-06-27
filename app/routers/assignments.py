@@ -89,6 +89,25 @@ def create_assignment(course_id: int, payload: schemas.AssignmentCreate, db: Ses
     db.add(new_assignment)
     db.commit()
     db.refresh(new_assignment)
+
+    # Send notifications
+    from .notifications import send_notification_helper, notify_admins
+    # 1. Notify all enrolled students
+    enrollments = db.query(models.Enrollment).filter(models.Enrollment.course_id == course_id).all()
+    for enrollment in enrollments:
+        send_notification_helper(
+            db, 
+            enrollment.student_id, 
+            "New Assignment Uploaded", 
+            f"Your teacher {current_user.full_name} has published a new assignment: '{new_assignment.title}' in course '{course.title}'."
+        )
+    # 2. Notify all admins
+    notify_admins(
+        db,
+        "New Assignment Created",
+        f"Teacher {current_user.full_name} created assignment '{new_assignment.title}' in course '{course.title}'."
+    )
+
     return new_assignment
 
 @router.put("/assignments/{assignment_id}", response_model=schemas.AssignmentResponse)
@@ -172,6 +191,7 @@ def submit_assignment(assignment_id: int, file: UploadFile = File(...), db: Sess
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
+    from .notifications import send_notification_helper, notify_admins
     if existing_submission:
         # Update existing submission
         existing_submission.file_path = f"/static/uploads/submissions/{safe_filename}"
@@ -179,6 +199,22 @@ def submit_assignment(assignment_id: int, file: UploadFile = File(...), db: Sess
         existing_submission.status = "Pending"
         db.commit()
         db.refresh(existing_submission)
+
+        # Notify Teacher
+        if assignment.course.teacher_id:
+            send_notification_helper(
+                db,
+                assignment.course.teacher_id,
+                "Assignment Submission Updated",
+                f"Student {current_user.full_name} has updated their submission for '{assignment.title}'."
+            )
+        # Notify Admins
+        notify_admins(
+            db,
+            "Assignment Submission Updated",
+            f"Student {current_user.full_name} updated submission for '{assignment.title}' in '{assignment.course.title}'."
+        )
+
         return existing_submission
     else:
         # Create new submission
@@ -191,6 +227,22 @@ def submit_assignment(assignment_id: int, file: UploadFile = File(...), db: Sess
         db.add(new_submission)
         db.commit()
         db.refresh(new_submission)
+
+        # Notify Teacher
+        if assignment.course.teacher_id:
+            send_notification_helper(
+                db,
+                assignment.course.teacher_id,
+                "New Assignment Submission",
+                f"Student {current_user.full_name} has submitted '{assignment.title}'."
+            )
+        # Notify Admins
+        notify_admins(
+            db,
+            "New Assignment Submission",
+            f"Student {current_user.full_name} submitted '{assignment.title}' in '{assignment.course.title}'."
+        )
+
         return new_submission
 
 @router.put("/submissions/{submission_id}", response_model=schemas.SubmissionResponse)
@@ -208,4 +260,21 @@ def grade_submission(submission_id: int, payload: schemas.GradeSubmission, db: S
     
     db.commit()
     db.refresh(submission)
+
+    # Send notifications
+    from .notifications import send_notification_helper, notify_admins
+    # Notify Student
+    send_notification_helper(
+        db,
+        submission.student_id,
+        "Assignment Graded",
+        f"Your submission for '{submission.assignment.title}' has been graded: {payload.marks}/{submission.assignment.total_marks} marks."
+    )
+    # Notify Admins
+    notify_admins(
+        db,
+        "Submission Graded",
+        f"Teacher {current_user.full_name} graded student {submission.student.full_name}'s submission for '{submission.assignment.title}': {payload.marks}/{submission.assignment.total_marks} marks."
+    )
+
     return submission

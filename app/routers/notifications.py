@@ -28,3 +28,19 @@ def create_notification(payload: schemas.NotificationCreate, db: Session = Depen
     db.commit()
     db.refresh(new_notification)
     return new_notification
+
+def send_notification_helper(db: Session, user_id: Optional[int], title: str, message: str):
+    notification = models.Notification(
+        user_id=user_id,
+        title=title,
+        message=message,
+        is_read=False
+    )
+    db.add(notification)
+    db.commit()
+
+def notify_admins(db: Session, title: str, message: str):
+    admins = db.query(models.User).filter(models.User.role == "admin").all()
+    for admin in admins:
+        send_notification_helper(db, admin.user_id, title, message)
+

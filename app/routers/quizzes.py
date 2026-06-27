@@ -78,6 +78,25 @@ def create_quiz(course_id: int, payload: schemas.QuizCreate, db: Session = Depen
     db.add(new_quiz)
     db.commit()
     db.refresh(new_quiz)
+
+    # Send notifications
+    from .notifications import send_notification_helper, notify_admins
+    # 1. Notify all enrolled students
+    enrollments = db.query(models.Enrollment).filter(models.Enrollment.course_id == course_id).all()
+    for enrollment in enrollments:
+        send_notification_helper(
+            db, 
+            enrollment.student_id, 
+            "New Quiz Available", 
+            f"Your teacher {current_user.full_name} has published a new quiz: '{new_quiz.title}' in course '{course.title}'."
+        )
+    # 2. Notify all admins
+    notify_admins(
+        db,
+        "New Quiz Created",
+        f"Teacher {current_user.full_name} created quiz '{new_quiz.title}' in course '{course.title}'."
+    )
+
     return new_quiz
 
 @router.delete("/quizzes/{quiz_id}", status_code=status.HTTP_200_OK)
@@ -214,6 +233,23 @@ def submit_quiz_attempt(quiz_id: int, payload: schemas.QuizAttemptCreate, db: Se
     db.add(new_attempt)
     db.commit()
     db.refresh(new_attempt)
+
+    # Send notifications
+    from .notifications import send_notification_helper, notify_admins
+    # Notify Teacher
+    if quiz.course.teacher_id:
+        send_notification_helper(
+            db,
+            quiz.course.teacher_id,
+            "Quiz Attempt Completed",
+            f"Student {current_user.full_name} has completed the quiz '{quiz.title}' with score: {score}/{quiz.total_marks}."
+        )
+    # Notify Admins
+    notify_admins(
+        db,
+        "Quiz Attempt Completed",
+        f"Student {current_user.full_name} completed quiz '{quiz.title}' in course '{quiz.course.title}' with score: {score}/{quiz.total_marks}."
+    )
     
     return {
         "attempt_id": new_attempt.attempt_id,

@@ -99,6 +99,7 @@ class Course(Base):
     enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
     certificates = relationship("Certificate", back_populates="course", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="course", cascade="all, delete-orphan")
+    sessions = relationship("ClassroomSession", back_populates="course", cascade="all, delete-orphan")
 
 class Module(Base):
     __tablename__ = "modules"
@@ -178,6 +179,22 @@ class Quiz(Base):
     course = relationship("Course", back_populates="quizzes")
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
     attempts = relationship("QuizAttempt", back_populates="quiz", cascade="all, delete-orphan")
+
+class ClassroomSession(Base):
+    __tablename__ = "classroom_sessions"
+    
+    session_id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    session_date = Column(Date, nullable=False)
+    start_time = Column(String(50), nullable=False)
+    end_time = Column(String(50), nullable=False)
+    room = Column(String(100), nullable=True)
+    meeting_link = Column(Text, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    
+    course = relationship("Course", back_populates="sessions")
 
 class Question(Base):
     __tablename__ = "questions"

@@ -112,7 +112,8 @@ def create_user_account(payload: schemas.UserRegister, db: Session = Depends(get
         password_hash=hashed_password,
         role=role,
         branch_id=payload.branch_id,
-        semester_id=semester_id
+        semester_id=semester_id,
+        is_verified=True
     )
     db.add(new_user)
     db.commit()

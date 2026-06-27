@@ -47,11 +47,56 @@ def seed_database():
             password_hash=hashed_admin_pass,
             role="admin",
             branch_id=branches["CSE"].branch_id,
-            semester_id=None
+            semester_id=None,
+            is_verified=True
         )
         db.add(admin)
         db.commit()
         print("Created Admin User: System Admin (admin@lms.com)")
+
+        # 4.b Seed Teachers (required to populate the admin assign faculty selection)
+        hashed_teacher_pass = security.get_password_hash("teacher123")
+        teachers_data = [
+            ("Prof. Alan Turing", "turing@lms.com", "CSE"),
+            ("Dr. Grace Hopper", "hopper@lms.com", "CSE"),
+            ("Dr. Richard Feynman", "feynman@lms.com", "IT"),
+            ("Dr. Ada Lovelace", "teacher_ada@lms.com", "AI&DS")
+        ]
+        for name, email, branch_name in teachers_data:
+            teacher = models.User(
+                full_name=name,
+                email=email,
+                password_hash=hashed_teacher_pass,
+                role="teacher",
+                branch_id=branches[branch_name].branch_id,
+                semester_id=None,
+                is_verified=True
+            )
+            db.add(teacher)
+            db.commit()
+            print(f"Created Teacher: {name} ({email})")
+
+        # 4.c Seed Students (required for active student dashboards)
+        hashed_student_pass = security.get_password_hash("student123")
+        students_data = [
+            ("Ada Lovelace", "student_ada@lms.com", "CSE", 1),
+            ("Steve Wozniak", "woz@lms.com", "CSE", 2),
+            ("John von Neumann", "neumann@lms.com", "IT", 1)
+        ]
+        for name, email, branch_name, sem_num in students_data:
+            student = models.User(
+                full_name=name,
+                email=email,
+                password_hash=hashed_student_pass,
+                role="student",
+                branch_id=branches[branch_name].branch_id,
+                semester_id=semesters_db[sem_num].semester_id,
+                is_verified=True
+            )
+            db.add(student)
+            db.commit()
+            print(f"Created Student: {name} ({email})")
+
 
         # 5. Mapped Semester-wise Courses (Complete Curriculum)
         curriculum = {

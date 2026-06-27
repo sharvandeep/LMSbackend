@@ -273,3 +273,26 @@ class EmailBroadcast(BaseModel):
     branch_id: Optional[int] = None
     semester_id: Optional[int] = None
 
+# ----------------- CLASSROOM SESSION SCHEMAS -----------------
+class ClassroomSessionCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    session_date: date
+    start_time: str
+    end_time: str
+    room: Optional[str] = None
+    meeting_link: Optional[str] = None
+
+class ClassroomSessionResponse(BaseSchema):
+    session_id: int
+    course_id: int
+    title: str
+    description: Optional[str] = None
+    session_date: date
+    start_time: str
+    end_time: str
+    room: Optional[str] = None
+    meeting_link: Optional[str] = None
+    created_at: datetime
+
+
